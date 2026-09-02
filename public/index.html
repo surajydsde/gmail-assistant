@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus Brief | Executive Email Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Ambient background glow -->
+  <div class="ambient-glow glow-top-left"></div>
+  <div class="ambient-glow glow-top-right"></div>
+
+  <div class="app-wrapper">
+    <!-- Top Navigation Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            <rect x="2" y="4" width="20" height="16" rx="3"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">
+            <span>Nexus</span>Brief
+            <span class="version-tag">AI Assistant</span>
+          </div>
+          <span class="brand-sub">Continuous Mail Intelligence Engine</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="status-pill" id="status-pill">
+          <span class="pulse-indicator" id="connection-indicator"></span>
+          <span id="last-sync-text">Connecting...</span>
+        </div>
+        
+        <button class="btn btn-secondary" id="btn-sync">
+          <svg class="icon-refresh" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 21h5v-5"/>
+          </svg>
+          <span id="btn-sync-text">Sync Mailbox</span>
+        </button>
+        <button class="btn btn-primary hidden" id="btn-connect">Connect Gmail</button>
+      </div>
+    </header>
+
+    <!-- Executive Metrics Grid -->
+    <section class="kpi-grid">
+      <div class="kpi-card" data-card="total">
+        <div class="kpi-header">
+          <span class="kpi-title">Cycle Volume</span>
+          <span class="kpi-badge">3h Cycle</span>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-number" id="metric-total">0</span>
+          <span class="kpi-sub">Total inbound communications</span>
+        </div>
+      </div>
+
+      <div class="kpi-card" data-card="unread">
+        <div class="kpi-header">
+          <span class="kpi-title">Unread Status</span>
+          <span class="kpi-badge badge-blue">Inbox</span>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-number text-blue" id="metric-unread">0</span>
+          <span class="kpi-sub">Awaiting executive triage</span>
+        </div>
+      </div>
+
+      <div class="kpi-card" data-card="action">
+        <div class="kpi-header">
+          <span class="kpi-title">Action Items</span>
+          <span class="kpi-badge badge-amber">Decisions</span>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-number text-amber" id="metric-action">0</span>
+          <span class="kpi-sub">Blocked on direct feedback</span>
+        </div>
+      </div>
+
+      <div class="kpi-card" data-card="priority">
+        <div class="kpi-header">
+          <span class="kpi-title">High Urgency</span>
+          <span class="kpi-badge badge-red">Critical</span>
+        </div>
+        <div class="kpi-body">
+          <span class="kpi-number text-red" id="metric-priority">0</span>
+          <span class="kpi-sub">Priority score &ge; 70</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Filter Toolbar -->
+    <section class="toolbar-section">
+      <div class="search-bar">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="input-search" placeholder="Search threads, people, decisions, or terms..." />
+        <span class="search-shortcut">⌘K</span>
+      </div>
+
+      <div class="filter-controls">
+        <div class="segmented-control" id="priority-segments">
+          <button class="segment active" data-priority="ALL">All Priority</button>
+          <button class="segment" data-priority="HIGH">High</button>
+          <button class="segment" data-priority="MEDIUM">Medium</button>
+          <button class="segment" data-priority="LOW">Low</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Category Pill Carousel -->
+    <div class="category-carousel" id="category-chips">
+      <button class="chip active" data-category="ALL">All Inbound</button>
+      <button class="chip" data-category="Urgent">🚨 Urgent</button>
+      <button class="chip" data-category="Requires Reply">💬 Requires Reply</button>
+      <button class="chip" data-category="Follow-Up Needed">⏳ Follow-Up</button>
+      <button class="chip" data-category="Meetings">📅 Meetings</button>
+      <button class="chip" data-category="Finance">💳 Finance</button>
+      <button class="chip" data-category="Work Updates">🚀 Work Updates</button>
+      <button class="chip" data-category="Newsletters">📰 Newsletters</button>
+      <button class="chip" data-category="Other">📁 Other</button>
+    </div>
+
+    <!-- Main Feed Section -->
+    <main class="feed-section">
+      <div id="loader" class="state-container hidden">
+        <div class="pulse-loader"></div>
+        <span>Analyzing message graphs & delta tokens...</span>
+      </div>
+
+      <div id="empty" class="state-container hidden">
+        <div class="empty-icon">✓</div>
+        <h3>Inbox Triage Clean</h3>
+        <p>No communications matched your selected priority and category filters.</p>
+      </div>
+
+      <div id="email-list" class="email-grid"></div>
+    </main>
+  </div>
+
+  <!-- Detail Inspection Drawer (Executive Preview) -->
+  <div class="drawer-backdrop hidden" id="drawer-backdrop">
+    <div class="drawer" id="email-drawer">
+      <div class="drawer-header">
+        <div class="drawer-meta">
+          <span class="badge" id="d-category">Category</span>
+          <span class="badge" id="d-priority">Score 0</span>
+        </div>
+        <button class="drawer-close" id="drawer-close">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <h2 id="d-subject">Subject Line</h2>
+        <div class="d-sender-line">
+          <div class="avatar" id="d-avatar">JD</div>
+          <div>
+            <div id="d-sender" class="d-sender-name">Sender Name</div>
+            <div id="d-date" class="d-date">Received Date</div>
+          </div>
+        </div>
+        <div class="executive-summary-card">
+          <div class="esc-title">Executive Action Rationale</div>
+          <p id="d-summary">Generated Summary</p>
+        </div>
+        <div class="full-body-section">
+          <h4>Snippet & Body Preview</h4>
+          <div id="d-body" class="body-content"></div>
+        </div>
+      </div>
+      <div class="drawer-footer">
+        <a id="d-link" href="#" target="_blank" class="btn btn-primary" rel="noopener">
+          Open In Gmail Thread &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

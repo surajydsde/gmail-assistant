@@ -1,0 +1,46 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model AuthToken {
+  id           Int      @id @default(1)
+  accessToken  String
+  refreshToken String
+  scope        String
+  tokenType    String
+  expiryDate   BigInt
+  updatedAt    DateTime @updatedAt
+}
+
+model SyncState {
+  id         Int      @id @default(1)
+  lastSyncAt DateTime @default(now())
+}
+
+model Email {
+  id              String   @id // Gmail Message ID
+  threadId        String
+  sender          String
+  senderEmail     String
+  subject         String
+  snippet         String
+  bodyPreview     String
+  receivedAt      DateTime
+  isUnread        Boolean
+  isActionRequired Boolean  @default(false)
+  priorityScore   Int      @default(0) // 0 to 100
+  category        String   // Urgent, Requires Reply, Follow-Up Needed, Meetings, Finance, Work Updates, Newsletters, Other
+  summary         String
+  isReviewed      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([priorityScore])
+  @@index([receivedAt])
+}
