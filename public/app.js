@@ -37,6 +37,47 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentPriority = 'ALL';
   let currentSearch = '';
   let emailCache = [];
+  let currentUser = null;
+
+  function handleSignedOut() {
+    currentUser = null;
+    elIndicator.classList.remove('connected');
+    elBtnConnect.classList.remove('hidden');
+    elBtnSync.disabled = true;
+    elLastSyncText.textContent = 'Gmail Disconnected';
+    elEmailList.innerHTML = '';
+    elEmpty.classList.remove('hidden');
+    elEmpty.querySelector('h3').textContent = 'Connect Gmail';
+    elEmpty.querySelector('p').textContent = 'Connect a Gmail account to load your executive email dashboard.';
+  }
+
+  function addAccountControls() {
+    if (document.getElementById('account-controls')) return;
+
+    const container = document.createElement('div');
+    container.id = 'account-controls';
+    container.style.cssText = 'display:flex;align-items:center;gap:10px;margin-left:10px;';
+
+    const account = document.createElement('span');
+    account.id = 'account-email';
+    account.style.cssText = 'font-size:12px;opacity:.8;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+
+    const logoutButton = document.createElement('button');
+    logoutButton.className = 'btn btn-secondary';
+    logoutButton.textContent = 'Disconnect';
+    logoutButton.addEventListener('click', async () => {
+      try {
+        await fetch('/auth/logout', { method: 'POST' });
+      } finally {
+        window.location.reload();
+      }
+    });
+
+    container.append(account, logoutButton);
+    document.querySelector('.header-controls')?.appendChild(container);
+  }
+
+  elBtnSync.disabled = true;
 
   // Authentication Status Check
   async function checkAuthStatus() {
@@ -45,8 +86,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
 
       if (data.authenticated) {
+        currentUser = data.user || null;
         elIndicator.classList.add('connected');
         elBtnConnect.classList.add('hidden');
+        elBtnSync.disabled = false;
+        addAccountControls();
+
+        const accountEmail = document.getElementById('account-email');
+        if (accountEmail && currentUser?.email) {
+          accountEmail.textContent = currentUser.email;
+          accountEmail.title = currentUser.email;
+        }
+
         if (data.lastSyncAt) {
           const syncDate = new Date(data.lastSyncAt);
           elLastSyncText.textContent = `Synced ${syncDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -54,9 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
           elLastSyncText.textContent = 'Auto-Sync Active';
         }
       } else {
-        elIndicator.classList.remove('connected');
-        elBtnConnect.classList.remove('hidden');
-        elLastSyncText.textContent = 'Gmail Disconnected';
+        handleSignedOut();
       }
     } catch (err) {
       console.error('Status check error:', err);
@@ -101,7 +150,12 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadMetrics() {
     try {
       const res = await fetch('/api/metrics');
+      if (res.status === 401) {
+        handleSignedOut();
+        return;
+      }
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load metrics.');
 
       animateValue(elMetricTotal, parseInt(elMetricTotal.textContent) || 0, data.total, 500);
       animateValue(elMetricUnread, parseInt(elMetricUnread.textContent) || 0, data.unread, 500);
@@ -144,7 +198,15 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       const res = await fetch(`/api/emails?${query.toString()}`);
+      if (res.status === 401) {
+        handleSignedOut();
+        elLoader.classList.add('hidden');
+        return;
+      }
       emailCache = await res.json();
+      if (!res.ok || !Array.isArray(emailCache)) {
+        throw new Error(emailCache?.error || 'Failed to load emails.');
+      }
 
       elLoader.classList.add('hidden');
 
@@ -160,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const initials = getInitials(email.sender);
         const dateStr = formatDate(email.receivedAt);
 
-        // Priority meter classes
         let meterFillClass = 'fill-low';
         if (email.priorityScore >= 70) meterFillClass = 'fill-high';
         else if (email.priorityScore >= 40) meterFillClass = 'fill-med';
@@ -197,7 +258,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Drawer Inspection Details
   function openEmailDrawer(email) {
     elDCategory.textContent = email.category;
     elDPriority.textContent = `Priority ${email.priorityScore}/100`;
@@ -217,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === elBackdrop) elBackdrop.classList.add('hidden');
   });
 
-  // Helpers
   function getInitials(name) {
     if (!name) return 'EX';
     const parts = name.trim().split(' ');
@@ -242,11 +301,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function refreshAll() {
     await checkAuthStatus();
+    if (!currentUser) return;
+
     await loadMetrics();
     await loadEmails();
   }
 
-  // Segment Priority Handlers
   elPrioritySegments.forEach(segment => {
     segment.addEventListener('click', () => {
       elPrioritySegments.forEach(s => s.classList.remove('active'));
@@ -256,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Category Chip Handlers
   elCategoryChips.forEach(chip => {
     chip.addEventListener('click', () => {
       elCategoryChips.forEach(c => c.classList.remove('active'));
@@ -266,7 +325,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Debounced Search Handler
   let searchTimeout = null;
   elInputSearch.addEventListener('input', () => {
     clearTimeout(searchTimeout);
@@ -276,7 +334,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 280);
   });
 
-  // Keyboard Shortcut: Cmd/Ctrl + K to focus search
   window.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
@@ -287,6 +344,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Initial Load
   refreshAll();
 });

@@ -11,8 +11,11 @@ export function getOAuth2Client() {
   );
 }
 
-export async function getAuthenticatedClient() {
-  const tokenRecord = await prisma.authToken.findUnique({ where: { id: 1 } });
+export async function getAuthenticatedClient(userId) {
+  const tokenRecord = await prisma.authToken.findUnique({
+    where: { userId }
+  });
+
   if (!tokenRecord) return null;
 
   const oauth2Client = getOAuth2Client();
@@ -25,17 +28,33 @@ export async function getAuthenticatedClient() {
   });
 
   oauth2Client.on('tokens', async (tokens) => {
-    await prisma.authToken.update({
-      where: { id: 1 },
-      data: {
-        accessToken: tokens.access_token,
-        expiryDate: tokens.expiry_date ? BigInt(tokens.expiry_date) : undefined,
-        ...(tokens.refresh_token && { refreshToken: tokens.refresh_token })
-      }
-    });
+    try {
+      await prisma.authToken.update({
+        where: { userId },
+        data: {
+          ...(tokens.access_token && { accessToken: tokens.access_token }),
+          ...(tokens.expiry_date && { expiryDate: BigInt(tokens.expiry_date) }),
+          ...(tokens.refresh_token && { refreshToken: tokens.refresh_token })
+        }
+      });
+    } catch (err) {
+      console.error(`[GMAIL] Failed to persist refreshed token for user ${userId}:`, err);
+    }
   });
 
   return oauth2Client;
+}
+
+export async function getGmailAccount(userId) {
+  const auth = await getAuthenticatedClient(userId);
+  if (!auth) return null;
+
+  const gmail = google.gmail({ version: 'v1', auth });
+  const profile = await gmail.users.getProfile({ userId: 'me' });
+
+  return {
+    emailAddress: profile.data.emailAddress
+  };
 }
 
 function parseEmailHeaders(headers = []) {
@@ -67,25 +86,33 @@ function extractBody(payload) {
   } else if (payload.body && payload.body.data) {
     body = Buffer.from(payload.body.data, 'base64').toString('utf-8');
   }
+
   return body.trim();
 }
 
-export async function syncGmailEmails() {
-  const auth = await getAuthenticatedClient();
+export async function syncGmailEmails(userId) {
+  const auth = await getAuthenticatedClient(userId);
   if (!auth) throw new Error('NOT_AUTHENTICATED');
 
   const gmail = google.gmail({ version: 'v1', auth });
 
-  // Read sync state
-  let syncState = await prisma.syncState.findUnique({ where: { id: 1 } });
+  let syncState = await prisma.syncState.findUnique({
+    where: { userId }
+  });
+
   if (!syncState) {
     syncState = await prisma.syncState.create({
-      data: { id: 1, lastSyncAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Default 24h back
+      data: {
+        userId,
+        lastSyncAt: new Date(Date.now() - 24 * 60 * 60 * 1000)
+      }
     });
   }
 
-  // Construct query to only fetch newer messages
-  const lastSyncEpochSec = Math.floor(new Date(syncState.lastSyncAt).getTime() / 1000);
+  const lastSyncEpochSec = Math.floor(
+    new Date(syncState.lastSyncAt).getTime() / 1000
+  );
+
   const q = `after:${lastSyncEpochSec}`;
 
   const listRes = await gmail.users.messages.list({
@@ -105,9 +132,13 @@ export async function syncGmailEmails() {
     });
 
     const msg = detail.data;
-    const { subject, sender, senderEmail, receivedAt } = parseEmailHeaders(msg.payload.headers);
+    const { subject, sender, senderEmail, receivedAt } =
+      parseEmailHeaders(msg.payload?.headers);
+
     const bodyPreview = extractBody(msg.payload).slice(0, 1000);
-    const isUnread = msg.labelIds ? msg.labelIds.includes('UNREAD') : false;
+    const isUnread = msg.labelIds
+      ? msg.labelIds.includes('UNREAD')
+      : false;
 
     const analysis = analyzeEmail({
       subject,
@@ -117,14 +148,20 @@ export async function syncGmailEmails() {
     });
 
     await prisma.email.upsert({
-      where: { id: msg.id },
+      where: {
+        userId_gmailMessageId: {
+          userId,
+          gmailMessageId: msg.id
+        }
+      },
       update: {
         isUnread,
         snippet: msg.snippet || '',
         updatedAt: new Date()
       },
       create: {
-        id: msg.id,
+        gmailMessageId: msg.id,
+        userId,
         threadId: msg.threadId,
         sender,
         senderEmail,
@@ -139,13 +176,16 @@ export async function syncGmailEmails() {
         summary: analysis.summary
       }
     });
+
     processedCount++;
   }
 
+  const lastSyncAt = new Date();
+
   await prisma.syncState.update({
-    where: { id: 1 },
-    data: { lastSyncAt: new Date() }
+    where: { userId },
+    data: { lastSyncAt }
   });
 
-  return { processed: processedCount, lastSyncAt: new Date() };
+  return { processed: processedCount, lastSyncAt };
 }
